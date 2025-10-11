@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+    <style>
+        :root {
+            --primary: #FF6B35; --secondary: #2C3E50; --light: #F8F9FA; --dark: #1A2530;
+            --success: #28A745; --danger: #DC3545; --warning: #FFC107; --info: #17A2B8;
+            --surface: #FFFFFF; --text-primary: #333333; --text-secondary: #6C757D;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--light); color: var(--text-primary); }
+        #app-container { transition: filter 0.3s; }
+        
+        #top-bar {
+            background: linear-gradient(135deg, var(--primary), #FF8C42); 
+            color: white; padding: 0 15px;
+            display: flex; align-items: center; height: 70px;
+            position: sticky; top: 0; z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #menu-toggle { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; margin-right: 15px; }
+        #page-title { font-size: 1.3rem; font-weight: 600; }
+        #top-bar-actions { margin-left: auto; display: flex; gap: 10px; }
+        .top-bar-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 15px; border-radius: 5px; cursor: pointer; transition: all 0.2s; }
+        .top-bar-btn:hover { background: rgba(255,255,255,0.3); }
+
+        #sidebar {
+            position: fixed; top: 0; left: 0; width: 280px; height: 100vh;
+            background: linear-gradient(to bottom, var(--secondary), var(--dark)); 
+            color: white; z-index: 2000;
+            transform: translateX(-100%); transition: transform 0.3s ease-in-out;
+            display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        #sidebar.open { transform: translateX(0); }
+        #sidebar-header { padding: 25px 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        #sidebar-header h2 { font-size: 1.4rem; font-weight: 600; }
+        #sidebar-header .close-btn { position: absolute; top: 20px; right: 20px; font-size: 1.8rem; cursor: pointer; opacity: 0.8; }
+        .nav-menu { list-style: none; padding: 0; margin: 20px 0; flex-grow: 1; }
+        .nav-menu li { padding: 15px 25px; cursor: pointer; border-left: 4px solid transparent; transition: all 0.2s; display: flex; align-items: center; }
+        .nav-menu li:hover { background-color: rgba(255,255,255,0.05); }
+        .nav-menu li.active { background-color: rgba(255,255,255,0.1); border-left-color: var(--primary); }
+        .nav-menu li i { margin-right: 15px; width: 20px; text-align: center; font-size: 1.1rem; }
+        #logout-btn { margin-top: auto; margin: 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 12px; border-radius: 5px; cursor: pointer; }
+
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); z-index: 1999; display: none;
+        }
+        #overlay.show { display: block; }
+        
+        #main-content { padding: 25px; min-height: calc(100vh - 70px); }
+        .page { display: none; } .page.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { 
+            background-color: var(--surface); border-radius: 12px; padding: 25px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        h1, h2, h3, h4 { color: var(--secondary); margin-bottom: 20px; }
+        h1 { font-size: 1.8rem; } h2 { font-size: 1.5rem; } h3 { font-size: 1.3rem; } h4 { font-size: 1.1rem; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        thead { display: none; background-color: var(--light); }
+        tr { display: block; margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; }
+        td { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        td:last-child { border-bottom: none; }
+        td::before { content: attr(data-label); font-weight: bold; margin-right: 10px; color: var(--text-secondary); }
+        .action-buttons { text-align: right; width: 100%; }
+        .action-btn { padding: 8px 15px; border: none; border-radius: 6px; color: white; cursor: pointer; margin: 3px; font-weight: 500; transition: all 0.2s; }
+        .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; text-align: left; color: var(--text-secondary); }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 8px; 
+            box-sizing: border-box; font-family: 'Poppins', sans-serif; 
+            transition: all 0.2s; background-color: #f9f9f9;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { 
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,107,53,0.2); background-color: white;
+        }
+        .btn-success { background-color: var(--success); } 
+        .btn-danger { background-color: var(--danger); } 
+        .btn-primary { background-color: var(--primary); }
+        .btn-warning { background-color: var(--warning); color: #333; }
+        .btn-info { background-color: var(--info); }
+        
+        .dynamic-item-list { list-style: none; padding-left: 0; }
+        .dynamic-item-list li { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--light); transition: background 0.2s; }
+        .dynamic-item-list li:hover { background-color: #f9f9f9; }
+        .withdraw-method-group { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+        .withdraw-method-group input { flex: 1; }
+
+        /* Stats cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: linear-gradient(135deg, var(--primary), #FF8C42); color: white; padding: 25px; border-radius: 12px; text-align: center; }
+        .stat-card h3 { color: white; margin-bottom: 10px; font-size: 1rem; opacity: 0.9; }
+        .stat-card h1 { color: white; font-size: 2.5rem; margin: 0; }
+
+        /* Device management */
+        .device-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--primary); }
+        .device-users { margin-top: 10px; }
+        .device-user { display: inline-block; background: var(--primary); color: white; padding: 3px 10px; border-radius: 15px; margin: 3px; font-size: 0.8rem; }
+
+        /* Tabs */
+        .tab-container { margin-bottom: 20px; }
+        .tab-buttons { display: flex; border-bottom: 1px solid #ddd; }
+        .tab-btn { padding: 12px 20px; background: none; border: none; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab-btn.active { border-bottom-color: var(--primary); color: var(--primary); font-weight: 600; }
+        .tab-content { padding: 20px 0; }
+
+        /* Footer */
+        .admin-footer {
+            text-align: center;
+            padding: 20px 15px;
+            margin-top: 30px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            border-top: 1px solid #e0e0e0;
+        }
+        .developer-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .developer-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Login Styles */
+        #login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary), #FF8C42);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-box h2 {
+            color: var(--secondary);
+            margin-bottom: 10px;
+        }
+        .login-box p {
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .login-btn:hover {
+            background: #FF8C42;
+            transform: translateY(-2px);
+        }
+        .login-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @media (min-width: 768px) {
+            #app-container { display: flex; }
+            #top-bar { display: none; }
+            #sidebar { position: static; transform: translateX(0); width: 280px; height: 100vh; }
+            #sidebar-header .close-btn { display: none; }
+            #main-content { flex-grow: 1; padding: 30px; }
+            thead { display: table-header-group; }
+            tr { display: table-row; margin-bottom: 0; border: none; padding: 0; }
+            td { display: table-cell; padding: 15px; border-bottom: 1px solid #e0e0e0; }
+            td::before { display: none; }
+            .action-buttons { text-align: left; }
+        }
+
+        /* Custom checkbox */
+        .checkbox-container { display: flex; align-items: center; margin-bottom: 15px; }
+        .checkbox-container input[type="checkbox"] { margin-right: 10px; width: 18px; height: 18px; }
+    </style>
+</head>
+<body>
+    <!-- Login Container -->
+    <div id="login-container">
+        <div class="login-box">
+            <h2><i class="fas fa-shield-alt"></i> Admin Panel</h2>
+            <p>Please enter your password to continue</p>
+            <div class="form-group">
+                <input type="password" id="login-password" placeholder="Enter Admin Password" style="text-align: center;">
+            </div>
+            <button class="login-btn" id="login-submit">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+            <p id="login-error" style="color: var(--danger); margin-top: 15px; display: none;">
+                <i class="fas fa-exclamation-triangle"></i> Invalid password!
+            </p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" style="display: none;">
+        <aside id="sidebar">
+            <div>
+                <div id="sidebar-header">
+                    <h2><i class="fas fa-shield-alt"></i> Admin Panel</h2>
+                    <span class="close-btn">&times;</span>
+                </div>
+                <ul class="nav-menu">
+                    <li data-page="dashboard" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
+                    <li data-page="users"><i class="fas fa-users"></i> Users</li>
+                    <li data-page="devices"><i class="fas fa-mobile-alt"></i> Device Management</li>
+                    <li data-page="withdrawals"><i class="fas fa-wallet"></i> Pending Withdrawals</li>
+                    <li data-page="history"><i class="fas fa-history"></i> Withdrawal History</li>
+                    <li data-page="tasks"><i class="fas fa-tasks"></i> Tasks & Links</li>
+                    <li data-page="settings"><i class="fas fa-cog"></i> App Settings</li>
+                    <li data-page="broadcast"><i class="fas fa-bullhorn"></i> Broadcast</li>
+                </ul>
+            </div>
+            <button id="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </aside>
+        
+        <div id="overlay"></div>
+
+        <div id="content-wrapper" style="width: 100%;">
+            <header id="top-bar">
+                <button id="menu-toggle"><i class="fas fa-bars"></i></button>
+                <h1 id="page-title">Dashboard</h1>
+                <div id="top-bar-actions">
+                    <button class="top-bar-btn" id="refresh-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+            </header>
+            <main id="main-content"></main>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const firebaseConfig = {
+            apiKey: "AIzaSyCudVtd11MFb7rqn-jaJQMh6IBwqYLIhqQ",
+            authDomain: "earn-master-bot-71086.firebaseapp.com",
+            databaseURL: "https://earn-master-bot-71086-default-rtdb.firebaseio.com",
+            projectId: "earn-master-bot-71086",
+            storageBucket: "earn-master-bot-71086.firebasestorage.app",
+            messagingSenderId: "1077961104769",
+            appId: "1:1077961104769:web:4be297d789087df0709c80"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        
+        const mainContent = document.getElementById('main-content');
+        const pageTitle = document.getElementById('page-title');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const refreshBtn = document.getElementById('refresh-btn');
+        
+        // Login elements
+        const loginContainer = document.getElementById('login-container');
+        const loginPassword = document.getElementById('login-password');
+        const loginSubmit = document.getElementById('login-submit');
+        const loginError = document.getElementById('login-error');
+
+        // Current active page
+        let currentPage = 'dashboard';
+        let adminPassword = '';
+
+        // Load admin password and check authentication
+        const initAdminPanel = async () => {
+            try {
+                const configSnapshot = await db.ref('config').once('value');
+                const config = configSnapshot.val() || {};
+                adminPassword = config.adminPassword || 'admin123'; // Default password
+                
+                // Check if user is already logged in
+                const isLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+                if (isLoggedIn) {
+                    showAdminPanel();
+                } else {
+                    showLogin();
+                }
+            } catch (error) {
+                console.error('Error loading admin configuration:', error);
+                adminPassword = 'admin123'; // Fallback default password
+                showLogin();
+            }
+        };
+
+        const showLogin = () => {
+            loginContainer.style.display = 'flex';
+            document.getElementById('app-container').style.display = 'none';
+            
+            // Focus on password input
+            setTimeout(() => {
+                loginPassword.focus();
+            }, 100);
+        };
+
+        const showAdminPanel = () => {
+            loginContainer.style.display = 'none';
+            document.getElementById('app-container').style.display = 'flex';
+            
+            // Initialize admin panel
+            setupNavigation(); 
+            setupMobileMenu(); 
+            setupTopBarButtons();
+            renderDashboard();
+        };
+
+        // Login functionality
+        loginSubmit.addEventListener('click', () => {
+            const enteredPassword = loginPassword.value.trim();
+            if (!enteredPassword) {
+                showLoginError('Please enter password');
+                return;
+            }
+            
+            if (enteredPassword === adminPassword) {
+                // Successful login
+                localStorage.setItem('adminLoggedIn', 'true');
+                showAdminPanel();
+            } else {
+                showLoginError('Invalid password!');
+            }
+        });
+
+        // Allow pressing Enter to login
+        loginPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loginSubmit.click();
+            }
+        });
+
+        const showLoginError = (message) => {
+            loginError.textContent = message;
+            loginError.style.display = 'block';
+            loginPassword.value = '';
+            loginPassword.focus();
+            
+            // Shake animation for error
+            loginPassword.style.animation = 'shake 0.5s';
+            setTimeout(() => {
+                loginPassword.style.animation = '';
+            }, 500);
+        };
+
+        // Add shake animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-5px); }
+                75% { transform: translateX(5px); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        const renderDashboard = async () => {
+            const usersSnap = await db.ref('users').once('value');
+            const withdrawalsSnap = await db.ref('withdrawals/pending').once('value');
+            const devicesSnap = await db.ref('deviceUsage').once('value');
+            
+            let multiDeviceCount = 0;
+            devicesSnap.forEach(device => {
+                const users = device.val().users;
+                if (users && Object.keys(users).length > 1) {
+                    multiDeviceCount++;
+                }
+            });
+
+            mainContent.innerHTML = `<div id="dashboard" class="page active">
+                <h2>Dashboard Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <h1>${usersSnap.numChildren()}</h1>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pending Withdrawals</h3>
+                        <h1>${withdrawalsSnap.numChildren()}</h1>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Multi-Device Users</h3>
+                        <h1>${multiDeviceCount}</h1>
+                        <small>Devices with multiple accounts</small>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Quick Actions</h3>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                        <button class="action-btn btn-primary" onclick="window.adminActions.renderWithdrawals()"><i class="fas fa-wallet"></i> Manage Withdrawals</button>
+                        <button class="action-btn btn-success" onclick="window.adminActions.renderUsers()"><i class="fas fa-users"></i> View Users</button>
+                        <button class="action-btn btn-info" onclick="window.adminActions.renderSettings()"><i class="fas fa-cog"></i> App Settings</button>
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div class="admin-footer">
+                    Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                </div>
+            </div>`;
+        };
+        
+        const renderUsers = async () => {
+            mainContent.innerHTML = '<div class="card"><h3>Loading Users...</h3></div>';
+            const snap = await db.ref('users').orderByChild('firstName').once('value'); let tableContent = '';
+            snap.forEach(child => {
+                const user = child.val();
+                tableContent += `<tr>
+                    <td data-label="User">${user.firstName || ''} ${user.lastName || ''}<br><small>${user.id}</small>${user.deviceId ? `<br><small style="color:#666;">Device: ${user.deviceId.substring(0, 8)}...</small>` : ''}</td>
+                    <td data-label="Balance">${(user.balance || 0).toFixed(2)} TK</td>
+                    <td data-label="Referrals">${user.referrals || 0}</td>
+                    <td data-label="Actions"><div class="action-buttons"><button class="action-btn btn-primary" onclick="window.adminActions.editUserBalance('${user.id}', '${user.firstName}')">Edit Balance</button></div></td>
+                </tr>`;
+            });
+            mainContent.innerHTML = `<div id="users" class="page active"><h2>All Users</h2><div class="card"><table><thead><tr><th>User</th><th>Balance</th><th>Referrals</th><th>Actions</th></tr></thead><tbody>${tableContent}</tbody></table></div>
+                
+                <!-- Footer -->
+                <div class="admin-footer">
+                    Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                </div>
+            </div>`;
+        };
+
+        // NEW: Device Management Page
+        const renderDevices = async () => {
+            mainContent.innerHTML = '<div class="card"><h3>Loading Device Information...</h3></div>';
+            const devicesSnap = await db.ref('deviceUsage').once('value');
+            const blockedSnap = await db.ref('blockedReferrals').once('value');
+            
+            let devicesContent = '';
+            let deviceCount = 0;
+            let multiAccountDevices = 0;
+
+            devicesSnap.forEach(deviceSnap => {
+                const deviceId = deviceSnap.key;
+                const deviceData = deviceSnap.val();
+                const users = deviceData.users || {};
+                const userCount = Object.keys(users).length;
+                
+                if (userCount > 1) {
+                    multiAccountDevices++;
+                }
+
+                deviceCount++;
+                
+                let usersList = '';
+                Object.keys(users).forEach(userId => {
+                    usersList += `<span class="device-user">${userId.substring(0, 8)}...</span>`;
+                });
+
+                devicesContent += `
+                    <div class="device-info">
+                        <strong>Device ID:</strong> ${deviceId}<br>
+                        <strong>Users on this device:</strong> ${userCount}<br>
+                        <strong>Last Used:</strong> ${deviceData.lastUsed ? new Date(deviceData.lastUsed).toLocaleString() : 'Unknown'}<br>
+                        <div class="device-users">${usersList}</div>
+                    </div>
+                `;
+            });
+
+            let blockedContent = '';
+            blockedSnap.forEach(blockedSnap => {
+                const blockedData = blockedSnap.val();
+                blockedContent += `
+                    <div class="device-info" style="background:#ffe6e6; border-left-color: var(--danger);">
+                        <strong>Reason:</strong> ${blockedData.reason || 'Unknown'}<br>
+                        <strong>Referrer:</strong> ${blockedData.referrerId || 'N/A'}<br>
+                        <strong>User:</strong> ${blockedData.earningUserId || blockedData.newUserId || 'N/A'}<br>
+                        <strong>Device:</strong> ${blockedData.deviceId || 'N/A'}<br>
+                        <strong>Time:</strong> ${new Date(blockedData.timestamp).toLocaleString()}<br>
+                        ${blockedData.amount ? `<strong>Amount:</strong> ${blockedData.amount} TK<br>` : ''}
+                    </div>
+                `;
+            });
+
+            mainContent.innerHTML = `
+                <div id="devices" class="page active">
+                    <h2>Device Management</h2>
+                    
+                    <div class="card">
+                        <h3>Device Statistics</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h3>Total Devices</h3>
+                                <h1>${deviceCount}</h1>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Multi-Account Devices</h3>
+                                <h1>${multiAccountDevices}</h1>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Blocked Referrals</h3>
+                                <h1>${blockedSnap.numChildren()}</h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>All Devices</h3>
+                        ${devicesContent || '<p>No device data found.</p>'}
+                    </div>
+
+                    <div class="card">
+                        <h3>Blocked Referral Attempts</h3>
+                        ${blockedContent || '<p>No blocked referrals found.</p>'}
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div class="admin-footer">
+                        Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                    </div>
+                </div>
+            `;
+        };
+        
+        const renderWithdrawals = async () => {
+            mainContent.innerHTML = '<div class="card"><h3>Loading Requests...</h3></div>';
+            const snap = await db.ref('withdrawals/pending').orderByChild('timestamp').once('value'); let tableContent = '';
+            let requests = [];
+            snap.forEach(child => { requests.push(child.val()); });
+            requests.reverse(); // Show newest first
+            requests.forEach(req => {
+                tableContent += `<tr>
+                    <td data-label="User">${req.userName}<br><small>${new Date(req.timestamp).toLocaleString()}</small></td>
+                    <td data-label="Amount"><b>${req.amount.toFixed(2)} TK</b><br><small>${req.method} | ${req.account}</small></td>
+                    <td data-label="Actions"><div class="action-buttons"><button class="action-btn btn-success" onclick="window.adminActions.handleWithdrawal('${req.id}', 'approve')">Approve</button><button class="action-btn btn-danger" onclick="window.adminActions.handleWithdrawal('${req.id}', 'reject')">Reject</button></div></td>
+                </tr>`;
+            });
+            mainContent.innerHTML = `<div id="withdrawals" class="page active"><h2>Pending Withdrawals</h2><div class="card"><table><thead><tr><th>User & Date</th><th>Amount & Details</th><th>Actions</th></tr></thead><tbody>${tableContent || '<tr><td colspan=3>No pending requests</td></tr>'}</tbody></table></div>
+                
+                <!-- Footer -->
+                <div class="admin-footer">
+                    Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                </div>
+            </div>`;
+        };
+        
+        const renderWithdrawalHistory = async () => {
+            mainContent.innerHTML = '<div class="card"><h3>Loading History...</h3></div>';
+            const completedSnap = await db.ref('withdrawals/completed').orderByChild('timestamp').limitToLast(100).once('value');
+            const rejectedSnap = await db.ref('withdrawals/rejected').orderByChild('timestamp').limitToLast(100).once('value');
+            let completedRows = '', rejectedRows = '';
+            
+            let completed = [];
+            completedSnap.forEach(child => { completed.push(child.val()); });
+            completed.reverse();
+            completed.forEach(req => { completedRows += `<tr><td data-label="User">${req.userName}</td><td data-label="Amount">${req.amount.toFixed(2)}</td><td data-label="Date">${new Date(req.timestamp).toLocaleDateString()}</td><td data-label="Status">Completed</td></tr>`; });
+
+            let rejected = [];
+            rejectedSnap.forEach(child => { rejected.push(child.val()); });
+            rejected.reverse();
+            rejected.forEach(req => { rejectedRows += `<tr><td data-label="User">${req.userName}</td><td data-label="Amount">${req.amount.toFixed(2)}</td><td data-label="Date">${new Date(req.timestamp).toLocaleDateString()}</td><td data-label="Status">Rejected</td></tr>`; });
+            
+            mainContent.innerHTML = `
+                <div id="history" class="page active">
+                    <h2>Withdrawal History</h2>
+                    <div class="tab-container">
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" data-tab="completed">Completed</button>
+                            <button class="tab-btn" data-tab="rejected">Rejected</button>
+                        </div>
+                        <div class="tab-content">
+                            <div id="completed-tab" class="tab-pane active">
+                                <div class="card">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>User</th>
+                                                <th>Amount</th>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${completedRows || '<tr><td colspan="4">No completed requests.</td></tr>'}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div id="rejected-tab" class="tab-pane" style="display: none;">
+                                <div class="card">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>User</th>
+                                                <th>Amount</th>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rejectedRows || '<tr><td colspan="4">No rejected requests.</td></tr>'}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div class="admin-footer">
+                        Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                    </div>
+                </div>`;
+                
+            // Add tab switching functionality
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+                    
+                    this.classList.add('active');
+                    document.getElementById(`${this.dataset.tab}-tab`).style.display = 'block';
+                });
+            });
+        };
+
+        const renderTasks = async () => {
+             mainContent.innerHTML = `<div id="tasks" class="page active"><h2>Manage Tasks & Links</h2>
+                <div class="card" id="tasks-list"><h3>Loading tasks...</h3></div>
+                <div class="card"><h3>Add New Task</h3>
+                    <div class="form-group"><input id="task-name" placeholder="Task Name (e.g., Join Telegram)"></div>
+                    <div class="form-group"><input id="task-url" placeholder="URL"></div>
+                    <div class="form-group"><input id="task-reward" type="number" placeholder="Reward Amount"></div>
+                    <div class="form-group"><input id="task-icon" placeholder="Image Icon URL"></div>
+                    <button class="action-btn btn-primary" onclick="window.adminActions.addTask()">Add Task</button>
+                </div>
+                <div class="card" id="links-list"><h3>Loading links...</h3></div>
+                <div class="card"><h3>Add New Link/Button</h3>
+                    <div class="form-group"><input id="link-name" placeholder="Button Name (e.g., Official Channel)"></div>
+                    <div class="form-group"><input id="link-url" placeholder="URL"></div>
+                    <div class="form-group"><input id="link-icon" placeholder="Image Icon URL"></div>
+                    <button class="action-btn btn-primary" onclick="window.adminActions.addLink()">Add Link</button>
+                </div>
+                
+                <!-- Footer -->
+                <div class="admin-footer">
+                    Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                </div>
+            </div>`;
+            loadDynamicContent('tasks'); loadDynamicContent('links');
+        };
+
+        const renderSettings = async () => {
+            const snap = await db.ref('config').once('value'); const config = snap.val() || {};
+            mainContent.innerHTML = `<div id="settings" class="page active"><h2>App Settings</h2>
+                <div class="card">
+                    <h3>Basic Settings</h3>
+                    <div class="form-group"><label>Bot Username (without @)</label><input type="text" id="botUsername" value="${config.botUsername || ''}"></div>
+                    <div class="form-group"><label>Welcome Message</label><textarea id="welcomeMessage" rows="3">${config.welcomeMessage || ''}</textarea></div>
+                    
+                    <h3>API & Ad Settings</h3>
+                    <div class="form-group"><label>Telegram Bot Token</label><input type="text" id="botToken" value="${config.botToken || ''}"></div>
+                    <div class="form-group"><label>Ad Network Zone ID</label><input type="number" id="adZoneId" value="${config.adZoneId || ''}"></div>
+                    
+                    <h3>Earning Settings</h3>
+                    <div class="form-group"><label>Value per Ad</label><input type="number" step="any" id="adValue" value="${config.adValue || 0}"></div>
+                    <div class="form-group"><label>Daily Ad Limit</label><input type="number" id="dailyAdLimit" value="${config.dailyAdLimit || 0}"></div>
+                    <div class="form-group"><label>Ads Before Break</label><input type="number" id="adsPerBreak" value="${config.adsPerBreak || 0}"></div>
+                    <div class="form-group"><label>Break Duration (Minutes)</label><input type="number" id="breakDuration" value="${config.breakDuration || 0}"></div>
+                    
+                    <h3>Referral System Settings</h3>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="referralSystemEnabled" ${config.referralSystemEnabled !== false ? 'checked' : ''}>
+                        <label for="referralSystemEnabled">Enable Referral System</label>
+                    </div>
+                    <div class="form-group"><label>Referral Commission Percentage</label><input type="number" step="any" id="referralPercent" value="${config.referralPercent || 10}"></div>
+                    <div class="form-group"><label>Referral Bonus</label><input type="number" step="any" id="referralBonus" value="${config.referralBonus || 0}"></div>
+                    
+                    <h3>Admin Security Settings</h3>
+                    <div class="form-group">
+                        <label>Change Admin Password</label>
+                        <input type="password" id="oldPassword" placeholder="Enter Current Password">
+                        <input type="password" id="newPassword" placeholder="Enter New Password" style="margin-top: 10px;">
+                        <input type="password" id="confirmPassword" placeholder="Confirm New Password" style="margin-top: 10px;">
+                        <button class="action-btn btn-warning" onclick="window.adminActions.changePassword()" style="margin-top: 10px; width: 100%;">
+                            <i class="fas fa-key"></i> Change Password
+                        </button>
+                    </div>
+                    
+                    <h3>Withdrawal Settings</h3>
+                    <div class="form-group"><label>Minimum Referrals for Withdraw</label><input type="number" id="minimumWithdrawReferrals" value="${config.minimumWithdrawReferrals || 0}"></div>
+                    <div id="withdraw-methods-container"></div>
+                    <button class="action-btn btn-primary" onclick="window.adminActions.addWithdrawMethodField()">+ Add Method</button>
+                    
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                        <button class="action-btn btn-success" style="width:100%; padding:15px; font-size: 1.1rem;" onclick="window.adminActions.saveSettings()">
+                            <i class="fas fa-save"></i> Save All Settings
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div class="admin-footer">
+                    Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                </div>
+            </div>`;
+            renderWithdrawMethods(config.withdrawMethods);
+        };
+        
+        const renderBroadcast = () => {
+             mainContent.innerHTML = `<div id="broadcast" class="page active"><h2>Broadcast Message</h2>
+                <div class="card">
+                    <p>This message will be sent to all users. <strong>Important:</strong> This requires a server-side function (like Firebase Cloud Functions) to work correctly.</p>
+                    <div class="form-group"><textarea id="broadcast-message" rows="5" placeholder="Your message here..."></textarea></div>
+                    <button class="action-btn btn-danger" onclick="window.adminActions.sendBroadcast()">Queue Broadcast</button>
+                </div>
+                
+                <!-- Footer -->
+                <div class="admin-footer">
+                    Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
+                </div>
+            </div>`;
+        };
+
+        const loadDynamicContent = async (type) => {
+            const container = document.getElementById(`${type}-list`);
+            const snap = await db.ref(`config/${type}`).once('value');
+            let items = [];
+            snap.forEach(child => { items.push({ key: child.key, ...child.val() }); });
+            items.reverse(); // Show newest first
+            
+            let content = `<h3>Current ${type.charAt(0).toUpperCase() + type.slice(1)}</h3>`;
+            if (items.length > 0) {
+                content += '<ul class="dynamic-item-list">';
+                items.forEach(item => {
+                    content += `<li>${item.name} <button class="action-btn btn-danger" style="padding: 5px 10px;" onclick="window.adminActions.deleteDynamicItem('${type}', '${item.key}')"><i class="fas fa-trash"></i></button></li>`;
+                });
+                content += '</ul>';
+            } else { content += `<p>No ${type} found.</p>`; }
+            container.innerHTML = content;
+        };
+        
+        const renderWithdrawMethods = (methods) => {
+            const container = document.getElementById('withdraw-methods-container'); container.innerHTML = '';
+            if (methods) {
+                methods.forEach((method, index) => {
+                    container.innerHTML += `<div class="withdraw-method-group" data-index="${index}"><input value="${method.name || ''}" placeholder="Method Name"><input type="number" step="any" value="${method.min || ''}" placeholder="Min Amount"><button class="action-btn btn-danger" onclick="this.parentElement.remove()">X</button></div>`;
+                });
+            }
+        };
+
+        window.adminActions = {
+            editUserBalance: async (userId, userName) => {
+                const amount = prompt(`Enter amount to ADD or SUBTRACT for ${userName}.\nUse negative value to subtract (e.g., -50).`);
+                if (amount && !isNaN(parseFloat(amount))) { try { await db.ref(`users/${userId}/balance`).set(firebase.database.ServerValue.increment(parseFloat(amount))); alert('Balance updated!'); renderUsers(); } catch (e) { alert('Error.'); } }
+            },
+            handleWithdrawal: async (reqId, action) => {
+                const reqRef = db.ref(`withdrawals/pending/${reqId}`); const snap = await reqRef.once('value'); const request = snap.val();
+                if (!request) { alert('Request not found.'); return; }
+                if (action === 'reject') { 
+                    await db.ref(`users/${request.userId}/balance`).set(firebase.database.ServerValue.increment(request.amount));
+                    // Optionally add a reason for rejection in a notification system
+                }
+                const status = action === 'approve' ? 'completed' : 'rejected';
+                await db.ref(`withdrawals/${status}/${reqId}`).set({ ...request, status });
+                await reqRef.remove(); alert(`Request has been ${status}.`); renderWithdrawals();
+            },
+            addTask: async () => {
+                const data = { name: document.getElementById('task-name').value, url: document.getElementById('task-url').value, reward: parseFloat(document.getElementById('task-reward').value), icon: document.getElementById('task-icon').value };
+                if (!data.name || !data.url || !data.reward || !data.icon) { alert('All fields are required.'); return; }
+                await db.ref('config/tasks').push(data); alert('Task added!'); renderTasks();
+            },
+            addLink: async () => {
+                const data = { name: document.getElementById('link-name').value, url: document.getElementById('link-url').value, icon: document.getElementById('link-icon').value };
+                if (!data.name || !data.url || !data.icon) { alert('Name, URL and Icon URL are required.'); return; }
+                await db.ref('config/links').push(data); alert('Link added!'); renderTasks();
+            },
+            deleteDynamicItem: async (type, key) => {
+                if (confirm(`Are you sure you want to delete this item?`)) { await db.ref(`config/${type}/${key}`).remove(); alert('Item deleted.'); renderTasks(); }
+            },
+            addWithdrawMethodField: () => {
+                 document.getElementById('withdraw-methods-container').innerHTML += `<div class="withdraw-method-group"><input placeholder="Method Name"><input type="number" placeholder="Min Amount"><button class="action-btn btn-danger" onclick="this.parentElement.remove()">X</button></div>`;
+            },
+            saveSettings: async () => {
+                const withdrawMethods = [];
+                document.querySelectorAll('.withdraw-method-group').forEach(group => {
+                    const name = group.children[0].value; const min = parseFloat(group.children[1].value);
+                    if (name && min) { withdrawMethods.push({ name, min }); }
+                });
+                const settings = {
+                    botUsername: document.getElementById('botUsername').value,
+                    botToken: document.getElementById('botToken').value,
+                    adZoneId: document.getElementById('adZoneId').value,
+                    welcomeMessage: document.getElementById('welcomeMessage').value,
+                    adValue: parseFloat(document.getElementById('adValue').value),
+                    referralBonus: parseFloat(document.getElementById('referralBonus').value),
+                    dailyAdLimit: parseInt(document.getElementById('dailyAdLimit').value),
+                    adsPerBreak: parseInt(document.getElementById('adsPerBreak').value),
+                    breakDuration: parseInt(document.getElementById('breakDuration').value),
+                    // NEW: Referral system control
+                    referralSystemEnabled: document.getElementById('referralSystemEnabled').checked,
+                    referralPercent: parseFloat(document.getElementById('referralPercent').value) || 10,
+                    minimumWithdrawReferrals: parseInt(document.getElementById('minimumWithdrawReferrals').value) || 0,
+                    withdrawMethods: withdrawMethods
+                };
+                await db.ref('config').update(settings); alert('Settings saved successfully!');
+            },
+            sendBroadcast: async () => {
+                const message = document.getElementById('broadcast-message').value;
+                if (!message || !confirm('Are you sure you want to queue this broadcast?')) { return; }
+                await db.ref('broadcastQueue').push({ message, timestamp: Date.now(), status: 'pending' });
+                alert('Broadcast has been added to the queue. The server will now process it.');
+            },
+            // NEW: Refresh current page
+            refreshPage: () => {
+                const pageMap = { 
+                    dashboard: renderDashboard, 
+                    users: renderUsers, 
+                    devices: renderDevices,
+                    withdrawals: renderWithdrawals, 
+                    history: renderWithdrawalHistory, 
+                    tasks: renderTasks, 
+                    settings: renderSettings, 
+                    broadcast: renderBroadcast 
+                };
+                if (pageMap[currentPage]) {
+                    pageMap[currentPage]();
+                    alert('Page refreshed!');
+                }
+            },
+            // NEW: Change admin password
+            changePassword: async () => {
+                const oldPassword = document.getElementById('oldPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                if (!oldPassword || !newPassword || !confirmPassword) {
+                    alert('Please fill in all password fields.');
+                    return;
+                }
+                
+                if (newPassword !== confirmPassword) {
+                    alert('New password and confirmation do not match.');
+                    return;
+                }
+                
+                if (newPassword.length < 4) {
+                    alert('Password must be at least 4 characters long.');
+                    return;
+                }
+                
+                // Verify old password
+                if (oldPassword !== adminPassword) {
+                    alert('Current password is incorrect.');
+                    return;
+                }
+                
+                // Update password
+                try {
+                    await db.ref('config/adminPassword').set(newPassword);
+                    adminPassword = newPassword;
+                    alert('Password changed successfully!');
+                    
+                    // Clear password fields
+                    document.getElementById('oldPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                } catch (error) {
+                    alert('Error changing password: ' + error.message);
+                }
+            },
+            // NEW: Logout function
+            logout: () => {
+                if (confirm('Are you sure you want to logout?')) {
+                    localStorage.removeItem('adminLoggedIn');
+                    showLogin();
+                }
+            }
+        };
+
+        const setupNavigation = () => {
+            const navLinks = document.querySelectorAll('.nav-menu li');
+            const pageMap = { 
+                dashboard: renderDashboard, 
+                users: renderUsers, 
+                devices: renderDevices, // NEW: Device management
+                withdrawals: renderWithdrawals, 
+                history: renderWithdrawalHistory, 
+                tasks: renderTasks, 
+                settings: renderSettings, 
+                broadcast: renderBroadcast 
+            };
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    const pageKey = e.currentTarget.dataset.page;
+                    if (pageKey) {
+                        currentPage = pageKey;
+                        navLinks.forEach(l => l.classList.remove('active'));
+                        e.currentTarget.classList.add('active');
+                        pageTitle.textContent = e.currentTarget.textContent.trim();
+                        pageMap[pageKey]();
+                        sidebar.classList.remove('open'); overlay.classList.remove('show');
+                    }
+                });
+            });
+        };
+        
+        const setupMobileMenu = () => {
+            const menuToggle = document.getElementById('menu-toggle');
+            const closeBtn = document.querySelector('#sidebar .close-btn');
+            menuToggle.addEventListener('click', () => { sidebar.classList.add('open'); overlay.classList.add('show'); });
+            closeBtn.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
+            overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
+        };
+
+        // NEW: Setup refresh button and logout
+        const setupTopBarButtons = () => {
+            refreshBtn.addEventListener('click', () => {
+                window.adminActions.refreshPage();
+            });
+            
+            // Logout button in sidebar
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                window.adminActions.logout();
+            });
+        };
+
+        // Initialize admin panel with login
+        initAdminPanel();
+    });
+    </script>
+</body>
+</html>
