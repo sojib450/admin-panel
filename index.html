@@ -79,7 +79,7 @@
         .action-btn { padding: 8px 15px; border: none; border-radius: 6px; color: white; cursor: pointer; margin: 3px; font-weight: 500; transition: all 0.2s; }
         .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         
-        .form-group { margin-bottom: 20px; }
+        .form-group { margin-bottom: 20px; position: relative; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 500; text-align: left; color: var(--text-secondary); }
         .form-group input, .form-group textarea, .form-group select { 
             width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 8px; 
@@ -138,7 +138,7 @@
             text-decoration: underline;
         }
 
-        /* Login Styles */
+        /* Enhanced Login Styles */
         #login-container {
             position: fixed;
             top: 0;
@@ -168,6 +168,21 @@
             color: var(--text-secondary);
             margin-bottom: 25px;
         }
+        .password-input-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
         .login-btn {
             width: 100%;
             padding: 12px;
@@ -188,6 +203,29 @@
             background: #ccc;
             cursor: not-allowed;
             transform: none;
+        }
+        .login-security {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        .login-security i {
+            color: var(--success);
+            margin-right: 8px;
+        }
+
+        /* Enhanced Task Management */
+        .task-settings-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .task-settings-group .form-group {
+            margin-bottom: 0;
         }
 
         /* Broadcast Message Styles */
@@ -230,6 +268,49 @@
             margin-left: 5px;
         }
 
+        /* Task Completion Stats */
+        .task-completion-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .task-stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .task-stat-card h4 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .task-stat-card p {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0;
+        }
+
+        /* Auto Logout Timer */
+        .logout-timer {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--warning);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            z-index: 1001;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: none;
+        }
+
         @media (min-width: 768px) {
             #app-container { display: flex; }
             #top-bar { display: none; }
@@ -249,13 +330,16 @@
     </style>
 </head>
 <body>
-    <!-- Login Container -->
+    <!-- Enhanced Login Container -->
     <div id="login-container">
         <div class="login-box">
             <h2><i class="fas fa-shield-alt"></i> Admin Panel</h2>
             <p>Please enter your password to continue</p>
-            <div class="form-group">
-                <input type="password" id="login-password" placeholder="Enter Admin Password" style="text-align: center;">
+            <div class="form-group password-input-container">
+                <input type="password" id="login-password" placeholder="Enter Admin Password" style="text-align: center; padding-right: 45px;">
+                <button type="button" class="password-toggle" id="password-toggle">
+                    <i class="fas fa-eye"></i>
+                </button>
             </div>
             <button class="login-btn" id="login-submit">
                 <i class="fas fa-sign-in-alt"></i> Login
@@ -263,7 +347,16 @@
             <p id="login-error" style="color: var(--danger); margin-top: 15px; display: none;">
                 <i class="fas fa-exclamation-triangle"></i> Invalid password!
             </p>
+            <div class="login-security">
+                <p><i class="fas fa-lock"></i> Secure Admin Access</p>
+                <p style="font-size: 0.75rem; margin-top: 5px;">Unauthorized access is prohibited</p>
+            </div>
         </div>
+    </div>
+
+    <!-- Auto Logout Timer -->
+    <div class="logout-timer" id="logout-timer">
+        Auto logout in: <span id="logout-time">30:00</span>
     </div>
 
     <!-- Main App Container -->
@@ -329,10 +422,25 @@
         const loginPassword = document.getElementById('login-password');
         const loginSubmit = document.getElementById('login-submit');
         const loginError = document.getElementById('login-error');
+        const passwordToggle = document.getElementById('password-toggle');
+        const logoutTimer = document.getElementById('logout-timer');
+        const logoutTime = document.getElementById('logout-time');
 
         // Current active page
         let currentPage = 'dashboard';
         let adminPassword = '';
+        let loginAttempts = 0;
+        const maxLoginAttempts = 5;
+        let loginLockedUntil = 0;
+        let autoLogoutTimer = null;
+        let autoLogoutTime = 30 * 60; // 30 minutes default
+
+        // Password toggle functionality
+        passwordToggle.addEventListener('click', () => {
+            const type = loginPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+            loginPassword.setAttribute('type', type);
+            passwordToggle.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
 
         // Load admin password and check authentication
         const initAdminPanel = async () => {
@@ -340,11 +448,31 @@
                 const configSnapshot = await db.ref('config').once('value');
                 const config = configSnapshot.val() || {};
                 adminPassword = config.adminPassword || 'admin123'; // Default password
+                autoLogoutTime = config.autoLogoutTime || 30; // minutes
+                
+                // Check if login is temporarily locked
+                const lockTime = localStorage.getItem('adminLoginLockedUntil');
+                if (lockTime && Date.now() < parseInt(lockTime)) {
+                    loginLockedUntil = parseInt(lockTime);
+                    showLoginLocked();
+                    return;
+                }
                 
                 // Check if user is already logged in
                 const isLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
-                if (isLoggedIn) {
-                    showAdminPanel();
+                const loginTime = localStorage.getItem('adminLoginTime');
+                const currentTime = Date.now();
+                
+                if (isLoggedIn && loginTime) {
+                    const timeSinceLogin = (currentTime - parseInt(loginTime)) / 1000 / 60; // minutes
+                    if (timeSinceLogin < autoLogoutTime) {
+                        showAdminPanel();
+                        startAutoLogoutTimer(autoLogoutTime * 60 - timeSinceLogin * 60);
+                    } else {
+                        localStorage.removeItem('adminLoggedIn');
+                        localStorage.removeItem('adminLoginTime');
+                        showLogin();
+                    }
                 } else {
                     showLogin();
                 }
@@ -358,6 +486,14 @@
         const showLogin = () => {
             loginContainer.style.display = 'flex';
             document.getElementById('app-container').style.display = 'none';
+            logoutTimer.style.display = 'none';
+            
+            // Reset login attempts if lock time has passed
+            if (loginLockedUntil && Date.now() > loginLockedUntil) {
+                loginAttempts = 0;
+                loginLockedUntil = 0;
+                localStorage.removeItem('adminLoginLockedUntil');
+            }
             
             // Focus on password input
             setTimeout(() => {
@@ -365,9 +501,33 @@
             }, 100);
         };
 
+        const showLoginLocked = () => {
+            const remainingTime = Math.ceil((loginLockedUntil - Date.now()) / 1000 / 60);
+            loginContainer.innerHTML = `
+                <div class="login-box">
+                    <h2><i class="fas fa-lock"></i> Access Temporarily Locked</h2>
+                    <p>Too many failed login attempts. Please try again in ${remainingTime} minutes.</p>
+                    <div class="login-security">
+                        <p><i class="fas fa-clock"></i> Security Lock Active</p>
+                    </div>
+                </div>
+            `;
+        };
+
         const showAdminPanel = () => {
             loginContainer.style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
+            
+            // Reset login attempts on successful login
+            loginAttempts = 0;
+            localStorage.removeItem('adminLoginAttempts');
+            localStorage.removeItem('adminLoginLockedUntil');
+            
+            // Store login time
+            localStorage.setItem('adminLoginTime', Date.now().toString());
+            
+            // Start auto logout timer
+            startAutoLogoutTimer(autoLogoutTime * 60);
             
             // Initialize admin panel
             setupNavigation(); 
@@ -376,8 +536,51 @@
             renderDashboard();
         };
 
-        // Login functionality
+        const startAutoLogoutTimer = (seconds) => {
+            if (autoLogoutTimer) {
+                clearInterval(autoLogoutTimer);
+            }
+            
+            let timeLeft = seconds;
+            updateLogoutTimerDisplay(timeLeft);
+            logoutTimer.style.display = 'block';
+            
+            autoLogoutTimer = setInterval(() => {
+                timeLeft--;
+                updateLogoutTimerDisplay(timeLeft);
+                
+                if (timeLeft <= 0) {
+                    clearInterval(autoLogoutTimer);
+                    autoLogout();
+                }
+            }, 1000);
+        };
+
+        const updateLogoutTimerDisplay = (seconds) => {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            logoutTime.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        };
+
+        const autoLogout = () => {
+            localStorage.removeItem('adminLoggedIn');
+            localStorage.removeItem('adminLoginTime');
+            showLogin();
+            alert('Session expired due to inactivity. Please login again.');
+        };
+
+        const resetAutoLogoutTimer = () => {
+            startAutoLogoutTimer(autoLogoutTime * 60);
+        };
+
+        // Enhanced Login functionality
         loginSubmit.addEventListener('click', () => {
+            // Check if login is locked
+            if (loginLockedUntil && Date.now() < loginLockedUntil) {
+                showLoginLocked();
+                return;
+            }
+            
             const enteredPassword = loginPassword.value.trim();
             if (!enteredPassword) {
                 showLoginError('Please enter password');
@@ -389,7 +592,18 @@
                 localStorage.setItem('adminLoggedIn', 'true');
                 showAdminPanel();
             } else {
-                showLoginError('Invalid password!');
+                loginAttempts++;
+                localStorage.setItem('adminLoginAttempts', loginAttempts.toString());
+                
+                if (loginAttempts >= maxLoginAttempts) {
+                    // Lock login for 30 minutes
+                    loginLockedUntil = Date.now() + (30 * 60 * 1000);
+                    localStorage.setItem('adminLoginLockedUntil', loginLockedUntil.toString());
+                    showLoginLocked();
+                } else {
+                    const remainingAttempts = maxLoginAttempts - loginAttempts;
+                    showLoginError(`Invalid password! ${remainingAttempts} attempts remaining`);
+                }
             }
         });
 
@@ -428,6 +642,7 @@
             const usersSnap = await db.ref('users').once('value');
             const withdrawalsSnap = await db.ref('withdrawals/pending').once('value');
             const devicesSnap = await db.ref('deviceUsage').once('value');
+            const tasksSnap = await db.ref('config/tasks').once('value');
             
             let multiDeviceCount = 0;
             devicesSnap.forEach(device => {
@@ -440,13 +655,44 @@
             // Calculate today's total ads watched
             const today = new Date().toISOString().slice(0, 10);
             let todayAdsWatched = 0;
+            let todayTaskCompletions = 0;
             
             usersSnap.forEach(user => {
                 const userData = user.val();
                 if (userData.lastAdWatchDate === today) {
                     todayAdsWatched += userData.dailyAdCount || 0;
                 }
+                
+                // Count task completions for today
+                if (userData.taskCompletions) {
+                    const taskCompletions = userData.taskCompletions[today] || 0;
+                    todayTaskCompletions += taskCompletions;
+                }
             });
+
+            // Calculate task completion stats
+            const taskStats = {};
+            if (tasksSnap.exists()) {
+                tasksSnap.forEach(taskSnap => {
+                    const task = taskSnap.val();
+                    taskStats[taskSnap.key] = {
+                        name: task.name,
+                        completions: 0
+                    };
+                });
+                
+                // Count completions for each task
+                usersSnap.forEach(user => {
+                    const userData = user.val();
+                    if (userData.completedTasks) {
+                        Object.keys(userData.completedTasks).forEach(taskId => {
+                            if (taskStats[taskId]) {
+                                taskStats[taskId].completions++;
+                            }
+                        });
+                    }
+                });
+            }
 
             mainContent.innerHTML = `<div id="dashboard" class="page active">
                 <h2>Dashboard Overview</h2>
@@ -470,6 +716,23 @@
                         <small>Total ads watched today</small>
                     </div>
                 </div>
+                
+                <div class="card">
+                    <h3>Today's Task Completions</h3>
+                    <div class="task-completion-stats">
+                        <div class="task-stat-card">
+                            <h4>Total Task Completions</h4>
+                            <p>${todayTaskCompletions}</p>
+                        </div>
+                        ${Object.keys(taskStats).map(taskId => `
+                            <div class="task-stat-card">
+                                <h4>${taskStats[taskId].name}</h4>
+                                <p>${taskStats[taskId].completions}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
                 <div class="card">
                     <h3>Quick Actions</h3>
                     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
@@ -504,11 +767,16 @@
                 const todayAds = (user.lastAdWatchDate === today) ? (user.dailyAdCount || 0) : 0;
                 const adsTodayBadge = todayAds > 0 ? `<span class="ads-today-badge">${todayAds} ads today</span>` : '';
                 
+                // Check task completions for today
+                const todayTasks = user.taskCompletions ? (user.taskCompletions[today] || 0) : 0;
+                const tasksTodayBadge = todayTasks > 0 ? `<span class="ads-today-badge" style="background: var(--success);">${todayTasks} tasks today</span>` : '';
+                
                 tableContent += `<tr>
                     <td data-label="User">
                         ${user.firstName || ''} ${user.lastName || ''}
                         ${statusBadge}
                         ${adsTodayBadge}
+                        ${tasksTodayBadge}
                         <br><small>${user.id}</small>
                         ${user.deviceId ? `<br><small style="color:#666;">Device: ${user.deviceId.substring(0, 8)}...</small>` : ''}
                         <br><small>Joined: ${new Date(user.joinDate || Date.now()).toLocaleDateString()}</small>
@@ -517,6 +785,7 @@
                         <strong>${(user.balance || 0).toFixed(2)} TK</strong>
                         <br><small>Total Earned: ${(user.totalEarned || 0).toFixed(2)} TK</small>
                         <br><small>Lifetime Ads: ${user.lifetimeAdCount || 0}</small>
+                        <br><small>Tasks Completed: ${Object.keys(user.completedTasks || {}).length}</small>
                     </td>
                     <td data-label="Referrals">${user.referrals || 0}</td>
                     <td data-label="Actions">
@@ -536,7 +805,7 @@
                 <div class="card">
                     <div style="margin-bottom: 15px;">
                         <p><strong>Today's Date:</strong> ${new Date().toLocaleDateString()}</p>
-                        <p><small>Shows how many ads each user watched today</small></p>
+                        <p><small>Shows how many ads and tasks each user completed today</small></p>
                     </div>
                     <table>
                         <thead>
@@ -750,13 +1019,58 @@
         };
 
         const renderTasks = async () => {
-             mainContent.innerHTML = `<div id="tasks" class="page active"><h2>Manage Tasks & Links</h2>
-                <div class="card" id="tasks-list"><h3>Loading tasks...</h3></div>
+            const snap = await db.ref('config/tasks').once('value');
+            let tasks = [];
+            snap.forEach(child => { tasks.push({ key: child.key, ...child.val() }); });
+            tasks.reverse();
+            
+            let tasksList = '';
+            tasks.forEach(task => {
+                tasksList += `
+                    <div class="task-container" style="margin-bottom: 15px; padding: 15px; border: 1px solid #eee; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h4>${task.name}</h4>
+                                <p>Reward: ${task.reward} TK | URL: ${task.url}</p>
+                                <p>Daily Limit: ${task.dailyLimit || 'No limit'} | Ads Before Break: ${task.adsPerBreak || 'No break'} | Break Time: ${task.breakDuration || 0} min</p>
+                                <p>Task Delay: ${task.taskDelay || 5} seconds</p>
+                            </div>
+                            <button class="action-btn btn-danger" onclick="window.adminActions.deleteDynamicItem('tasks', '${task.key}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            mainContent.innerHTML = `<div id="tasks" class="page active"><h2>Manage Tasks & Links</h2>
+                <div class="card">
+                    <h3>Current Tasks</h3>
+                    ${tasksList || '<p>No tasks found.</p>'}
+                </div>
                 <div class="card"><h3>Add New Task</h3>
                     <div class="form-group"><input id="task-name" placeholder="Task Name (e.g., Join Telegram)"></div>
                     <div class="form-group"><input id="task-url" placeholder="URL"></div>
                     <div class="form-group"><input id="task-reward" type="number" placeholder="Reward Amount"></div>
                     <div class="form-group"><input id="task-icon" placeholder="Image Icon URL"></div>
+                    
+                    <div class="task-settings-group">
+                        <div class="form-group">
+                            <label>Daily Task Limit</label>
+                            <input id="task-daily-limit" type="number" placeholder="0 for no limit" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Ads Before Break</label>
+                            <input id="task-ads-break" type="number" placeholder="0 for no break" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Break Duration (Minutes)</label>
+                            <input id="task-break-duration" type="number" placeholder="Break time in minutes" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Task Delay (Seconds)</label>
+                            <input id="task-delay" type="number" placeholder="Delay before reward" value="5">
+                        </div>
+                    </div>
+                    
                     <button class="action-btn btn-primary" onclick="window.adminActions.addTask()">Add Task</button>
                 </div>
                 <div class="card" id="links-list"><h3>Loading links...</h3></div>
@@ -772,7 +1086,7 @@
                     Developed by <span class="developer-link" onclick="window.open('https://t.me/sojib4280', '_blank')">Sojib</span>
                 </div>
             </div>`;
-            loadDynamicContent('tasks'); loadDynamicContent('links');
+            loadDynamicContent('links');
         };
 
         const renderSettings = async () => {
@@ -783,9 +1097,17 @@
                     <div class="form-group"><label>Bot Username (without @)</label><input type="text" id="botUsername" value="${config.botUsername || ''}"></div>
                     <div class="form-group"><label>Welcome Message</label><textarea id="welcomeMessage" rows="3">${config.welcomeMessage || ''}</textarea></div>
                     
-                    <h3>API & Ad Settings</h3>
-                    <div class="form-group"><label>Telegram Bot Token</label><input type="text" id="botToken" value="${config.botToken || ''}"></div>
-                    <div class="form-group"><label>Ad Network Zone ID</label><input type="number" id="adZoneId" value="${config.adZoneId || ''}"></div>
+                    <h3>Ad Settings</h3>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="monetagEnabled" ${config.monetagEnabled !== false ? 'checked' : ''}>
+                        <label for="monetagEnabled">Enable Monetag Ads</label>
+                    </div>
+                    <div class="form-group"><label>Monetag Ad Zone ID</label><input type="number" id="adZoneId" value="${config.adZoneId || ''}"></div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="adexoraEnabled" ${config.adexoraEnabled !== false ? 'checked' : ''}>
+                        <label for="adexoraEnabled">Enable Adexora Ads</label>
+                    </div>
                     <div class="form-group"><label>Adexora Ad ID</label><input type="number" id="adexoraId" value="${config.adexoraId || ''}" placeholder="Enter Adexora Ad ID"></div>
                     
                     <h3>Earning Settings</h3>
@@ -811,6 +1133,11 @@
                         <button class="action-btn btn-warning" onclick="window.adminActions.changePassword()" style="margin-top: 10px; width: 100%;">
                             <i class="fas fa-key"></i> Change Password
                         </button>
+                    </div>
+                    <div class="form-group">
+                        <label>Auto Logout Time (Minutes)</label>
+                        <input type="number" id="autoLogoutTime" value="${config.autoLogoutTime || 30}" placeholder="Auto logout after minutes">
+                        <small>Set to 0 to disable auto logout</small>
                     </div>
                     
                     <h3>Withdrawal Settings</h3>
@@ -996,7 +1323,11 @@
                     name: document.getElementById('task-name').value, 
                     url: document.getElementById('task-url').value, 
                     reward: parseFloat(document.getElementById('task-reward').value), 
-                    icon: document.getElementById('task-icon').value 
+                    icon: document.getElementById('task-icon').value,
+                    dailyLimit: parseInt(document.getElementById('task-daily-limit').value) || 0,
+                    adsPerBreak: parseInt(document.getElementById('task-ads-break').value) || 0,
+                    breakDuration: parseInt(document.getElementById('task-break-duration').value) || 0,
+                    taskDelay: parseInt(document.getElementById('task-delay').value) || 5
                 };
                 if (!data.name || !data.url || !data.reward || !data.icon) { alert('All fields are required.'); return; }
                 await db.ref('config/tasks').push(data); 
@@ -1037,10 +1368,11 @@
                 });
                 const settings = {
                     botUsername: document.getElementById('botUsername').value,
-                    botToken: document.getElementById('botToken').value,
-                    adZoneId: document.getElementById('adZoneId').value,
-                    adexoraId: document.getElementById('adexoraId').value,
                     welcomeMessage: document.getElementById('welcomeMessage').value,
+                    monetagEnabled: document.getElementById('monetagEnabled').checked,
+                    adZoneId: document.getElementById('adZoneId').value,
+                    adexoraEnabled: document.getElementById('adexoraEnabled').checked,
+                    adexoraId: document.getElementById('adexoraId').value,
                     adValue: parseFloat(document.getElementById('adValue').value),
                     referralBonus: parseFloat(document.getElementById('referralBonus').value),
                     dailyAdLimit: parseInt(document.getElementById('dailyAdLimit').value),
@@ -1049,9 +1381,17 @@
                     referralSystemEnabled: document.getElementById('referralSystemEnabled').checked,
                     referralPercent: parseFloat(document.getElementById('referralPercent').value) || 10,
                     minimumWithdrawReferrals: parseInt(document.getElementById('minimumWithdrawReferrals').value) || 0,
+                    autoLogoutTime: parseInt(document.getElementById('autoLogoutTime').value) || 30,
                     withdrawMethods: withdrawMethods
                 };
                 await db.ref('config').update(settings); 
+                
+                // Update current values
+                autoLogoutTime = settings.autoLogoutTime;
+                if (autoLogoutTimer) {
+                    resetAutoLogoutTimer();
+                }
+                
                 alert('Settings saved successfully!');
             },
             
@@ -1150,6 +1490,10 @@
             logout: () => {
                 if (confirm('Are you sure you want to logout?')) {
                     localStorage.removeItem('adminLoggedIn');
+                    localStorage.removeItem('adminLoginTime');
+                    if (autoLogoutTimer) {
+                        clearInterval(autoLogoutTimer);
+                    }
                     showLogin();
                 }
             }
@@ -1200,6 +1544,11 @@
                 window.adminActions.logout();
             });
         };
+
+        // Reset auto logout timer on user activity
+        document.addEventListener('click', resetAutoLogoutTimer);
+        document.addEventListener('keypress', resetAutoLogoutTimer);
+        document.addEventListener('mousemove', resetAutoLogoutTimer);
 
         // Initialize admin panel with login
         initAdminPanel();
